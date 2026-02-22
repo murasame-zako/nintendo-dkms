@@ -183,6 +183,14 @@
 #define JC_IMU_GYRO_FUZZ		10
 #define JC_IMU_GYRO_FLAT		0
 
+/* 
+* Some cloned Controllers have the IMU oriented incorrectly
+* this function helps to flip the IMU to the correct orientation.
+*/
+static int imu_type = 1;
+module_param(imu_type, int, 0644);
+MODULE_PARM_DESC(imu_type, "IMU orientation type: 1=Standard, 2=Alternative(For some clone Controller) (default=1)");
+
 /* frequency/amplitude tables for rumble */
 struct joycon_rumble_freq_data {
 	u16 high;
@@ -1542,12 +1550,23 @@ static void joycon_parse_imu_report(struct joycon_ctlr *ctlr,
 			}
 		}
 
-		input_report_abs(idev, ABS_RX, value[0]);
-		input_report_abs(idev, ABS_RY, value[1]);
-		input_report_abs(idev, ABS_RZ, value[2]);
-		input_report_abs(idev, ABS_X, value[3]);
-		input_report_abs(idev, ABS_Y, value[4]);
-		input_report_abs(idev, ABS_Z, value[5]);
+		if (imu_type == 1) {
+			/* imu type 1 */
+			input_report_abs(idev, ABS_RX, value[0]);
+			input_report_abs(idev, ABS_RY, value[1]);
+			input_report_abs(idev, ABS_RZ, value[2]);
+			input_report_abs(idev, ABS_X, value[3]);
+			input_report_abs(idev, ABS_Y, value[4]);
+			input_report_abs(idev, ABS_Z, value[5]);
+		} else {
+			/* imu type 2 */
+			input_report_abs(idev, ABS_RX, ~value[1]);
+			input_report_abs(idev, ABS_RY, value[2]);
+			input_report_abs(idev, ABS_RZ, ~value[0]);
+			input_report_abs(idev, ABS_X, ~value[4]);
+			input_report_abs(idev, ABS_Y, value[5]);
+			input_report_abs(idev, ABS_Z, ~value[3]);
+		}
 		input_sync(idev);
 		/* convert to micros and divide by 3 (3 samples per report). */
 		ctlr->imu_timestamp_us += ctlr->imu_avg_delta_ms * 1000 / 3;
