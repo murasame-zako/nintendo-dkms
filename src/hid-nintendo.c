@@ -2138,10 +2138,6 @@ static int joycon_input_create(struct joycon_ctlr *ctlr)
 	ctlr->input->phys = hdev->phys;
 	input_set_drvdata(ctlr->input, ctlr);
 
-	ret = input_register_device(ctlr->input);
-	if (ret)
-		return ret;
-
 	if (joycon_type_is_right_joycon(ctlr)) {
 		joycon_config_right_stick(ctlr->input);
 		joycon_config_buttons(ctlr->input, right_joycon_button_mappings);
@@ -2172,14 +2168,18 @@ static int joycon_input_create(struct joycon_ctlr *ctlr)
 		joycon_config_buttons(ctlr->input, n64con_button_mappings);
 	}
 
+	if (joycon_has_rumble(ctlr))
+		joycon_config_rumble(ctlr);
+
+	ret = input_register_device(ctlr->input);
+	if (ret)
+		return ret;
+
 	if (joycon_has_imu(ctlr)) {
 		ret = joycon_imu_input_create(ctlr);
 		if (ret)
 			return ret;
 	}
-
-	if (joycon_has_rumble(ctlr))
-		joycon_config_rumble(ctlr);
 
 	return 0;
 }
