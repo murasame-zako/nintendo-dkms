@@ -826,11 +826,34 @@ static void joycon_wait_for_input_report(struct joycon_ctlr *ctlr)
 #define JC_INPUT_REPORT_MIN_DELTA	8
 #define JC_INPUT_REPORT_MAX_DELTA	17
 #define JC_SUBCMD_TX_OFFSET_MS		4
-#define JC_SUBCMD_VALID_DELTA_REQ	3
-#define JC_SUBCMD_RATE_MAX_ATTEMPTS	25
-#define JC_SUBCMD_RATE_LIMITER_USB_MS	20
-#define JC_SUBCMD_RATE_LIMITER_BT_MS	60
-#define JC_SUBCMD_RATE_LIMITER_MS(ctlr)	((ctlr)->hdev->bus == BUS_USB ? JC_SUBCMD_RATE_LIMITER_USB_MS : JC_SUBCMD_RATE_LIMITER_BT_MS)
+
+/*
+* Some clone controllers and cheap Bluetooth receivers have reported unstable frequencies
+* exposing these values ​​to sysfs makes it easier to adjust them.
+*/
+
+// #define JC_SUBCMD_VALID_DELTA_REQ	3
+// #define JC_SUBCMD_RATE_MAX_ATTEMPTS	25
+// #define JC_SUBCMD_RATE_LIMITER_USB_MS	20
+// #define JC_SUBCMD_RATE_LIMITER_BT_MS	60
+
+static int jc_subcmd_valid_delta_req = 3;
+module_param(jc_subcmd_valid_delta_req, int, 0644);
+MODULE_PARM_DESC(jc_subcmd_valid_delta_req, "Consecutive valid report deltas required before sending (default=3)");
+
+static int jc_subcmd_rate_max_attempts = 25;
+module_param(jc_subcmd_rate_max_attempts, int, 0644);
+MODULE_PARM_DESC(jc_subcmd_rate_max_attempts, "Max wait attempts for rate limiter (default=25)");
+
+static int jc_subcmd_rate_limiter_usb_ms = 20;
+module_param(jc_subcmd_rate_limiter_usb_ms, int, 0644);
+MODULE_PARM_DESC(jc_subcmd_rate_limiter_usb_ms, "Rate limiter for USB subcmds in ms (default=20)");
+
+static int jc_subcmd_rate_limiter_bt_ms = 60;
+module_param(jc_subcmd_rate_limiter_bt_ms, int, 0644);
+MODULE_PARM_DESC(jc_subcmd_rate_limiter_bt_ms, "Rate limiter for BT subcmds in ms (default=60)");
+
+#define JC_SUBCMD_RATE_LIMITER_MS(ctlr)	((ctlr)->hdev->bus == BUS_USB ? jc_subcmd_rate_limiter_usb_ms : jc_subcmd_rate_limiter_bt_ms)
 static void joycon_enforce_subcmd_rate(struct joycon_ctlr *ctlr)
 {
 	unsigned int current_ms;
@@ -852,12 +875,12 @@ static void joycon_enforce_subcmd_rate(struct joycon_ctlr *ctlr)
 		spin_unlock_irqrestore(&ctlr->lock, flags);
 
 		attempts++;
-	} while ((consecutive_valid_deltas < JC_SUBCMD_VALID_DELTA_REQ ||
+	} while ((consecutive_valid_deltas < jc_subcmd_valid_delta_req ||
 		  subcmd_delta < JC_SUBCMD_RATE_LIMITER_MS(ctlr)) &&
 		 ctlr->ctlr_state == JOYCON_CTLR_STATE_READ &&
-		 attempts < JC_SUBCMD_RATE_MAX_ATTEMPTS);
+		 attempts < jc_subcmd_rate_max_attempts);
 
-	if (attempts >= JC_SUBCMD_RATE_MAX_ATTEMPTS) {
+	if (attempts >= jc_subcmd_rate_max_attempts) {
 		hid_warn(ctlr->hdev, "%s: exceeded max attempts", __func__);
 		return;
 	}
@@ -1756,7 +1779,7 @@ static void joycon_parse_report(struct joycon_ctlr *ctlr,
 	 */
 	if (report_delta_ms >= JC_INPUT_REPORT_MIN_DELTA &&
 	    report_delta_ms <= JC_INPUT_REPORT_MAX_DELTA) {
-		if (ctlr->consecutive_valid_report_deltas < JC_SUBCMD_VALID_DELTA_REQ)
+		if (ctlr->consecutive_valid_report_deltas < jc_subcmd_valid_delta_req)
 			ctlr->consecutive_valid_report_deltas++;
 	} else {
 		ctlr->consecutive_valid_report_deltas = 0;
@@ -1768,7 +1791,7 @@ static void joycon_parse_report(struct joycon_ctlr *ctlr,
 	 * delta requirement.
 	 */
 	if (ctlr->hdev->bus == BUS_USB)
-		ctlr->consecutive_valid_report_deltas = JC_SUBCMD_VALID_DELTA_REQ;
+		ctlr->consecutive_valid_report_deltas = jc_subcmd_valid_delta_req;
 
 	spin_unlock_irqrestore(&ctlr->lock, flags);
 
