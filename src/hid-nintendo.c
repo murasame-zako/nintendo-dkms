@@ -191,6 +191,15 @@ static int imu_type = 1;
 module_param(imu_type, int, 0644);
 MODULE_PARM_DESC(imu_type, "IMU orientation type: 1=Standard, 2=Alternative(For some clone Controller) (default=1)");
 
+/*
+* Some inexpensive controllers have inconsistent IMU reporting frequencies
+* but this does not affect usability. 
+* Use this switch to avoid printing too many warnings in kmsg.
+*/
+static bool ignore_dropped_imu_reports = false;
+module_param(ignore_dropped_imu_reports, bool, 0644);
+MODULE_PARM_DESC(ignore_dropped_imu_reports, "Ignore IMU dropped packet warnings (default=false)");
+
 /* frequency/amplitude tables for rumble */
 struct joycon_rumble_freq_data {
 	u16 high;
@@ -1485,7 +1494,7 @@ static void joycon_parse_imu_report(struct joycon_ctlr *ctlr,
 		dropped_pkts = (delta - min(delta, dropped_threshold)) /
 				ctlr->imu_avg_delta_ms;
 		ctlr->imu_timestamp_us += 1000 * ctlr->imu_avg_delta_ms;
-		if (dropped_pkts > JC_IMU_DROPPED_PKT_WARNING) {
+		if (!ignore_dropped_imu_reports && dropped_pkts > JC_IMU_DROPPED_PKT_WARNING) {
 			hid_warn_ratelimited(ctlr->hdev,
 				 "compensating for %u dropped IMU reports\n",
 				 dropped_pkts);
